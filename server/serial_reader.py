@@ -5,7 +5,7 @@ import time
 import re
 
 # Configure the serial port (change 'COM3' to your Arduino's port)
-ser = serial.Serial('COM7', 9600, timeout=1)
+ser = serial.Serial('COM11', 9600, timeout=1)
 server_url = 'http://localhost:3000/message'
 
 def process_message(message):
