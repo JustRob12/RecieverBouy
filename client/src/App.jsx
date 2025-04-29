@@ -4,13 +4,17 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-
 import 'leaflet/dist/leaflet.css';
 
 function extractLatLng(message) {
-  const latMatch = message.match(/Lat:\s*([\d.\-]+)/i);
-  const lngMatch = message.match(/Lng:\s*([\d.\-]+)/i);
+  const latMatch = message.match(/Lat:\s*([\d.-]+)/);
+  const lngMatch = message.match(/Lng:\s*([\d.-]+)/);
+  
   if (latMatch && lngMatch) {
-    return {
-      lat: parseFloat(latMatch[1]),
-      lng: parseFloat(lngMatch[1])
-    };
+    const lat = parseFloat(latMatch[1]);
+    const lng = parseFloat(lngMatch[1]);
+    
+    // Validate the coordinates
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
   }
   return null;
 }
@@ -18,7 +22,7 @@ function extractLatLng(message) {
 function MapAutoFollow({ latLng }) {
   const map = useMap();
   useEffect(() => {
-    if (latLng) {
+    if (latLng && latLng.lat && latLng.lng) {
       map.setView([latLng.lat, latLng.lng], map.getZoom(), { animate: true });
     }
   }, [latLng, map]);
@@ -49,31 +53,41 @@ function parseSensorData(message) {
   return null;
 }
 
-function SensorDataTable({ data }) {
-  if (!data) return null;
+function SensorDataTable({ messages }) {
+  // Parse sensor data from messages
+  const sensorDataRows = messages
+    .map(message => ({
+      ...parseSensorData(message.content),
+      timestamp: message.timestamp
+    }))
+    .filter(data => data.date); // Only include messages that could be parsed as sensor data
+
+  if (!sensorDataRows.length) return <p>No sensor data available...</p>;
   
   return (
     <div className="sensor-data-table">
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Time</th>
+            <th>DATE</th>
+            <th>TIME</th>
             <th>GPS</th>
-            <th>pH Level</th>
-            <th>Temperature</th>
-            <th>TDH</th>
+            <th>PH LEVEL</th>
+            <th>TEMPERATURE</th>
+            <th>TDS</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>{data.date}</td>
-            <td>{data.time}</td>
-            <td>{data.gps}</td>
-            <td>{data.ph}</td>
-            <td>{data.temperature}</td>
-            <td>{data.tdh}</td>
-          </tr>
+          {sensorDataRows.map((data, index) => (
+            <tr key={data.timestamp}>
+              <td>{data.date}</td>
+              <td>{data.time}</td>
+              <td>{data.gps}</td>
+              <td>{data.ph}</td>
+              <td>{data.temperature}</td>
+              <td>{data.tdh}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -85,7 +99,7 @@ function App() {
   const [notifications, setNotifications] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [locationHistory, setLocationHistory] = useState([]);
-  const [sensorData, setSensorData] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState(null);
 
   useEffect(() => {
     // Function to fetch messages from the server
@@ -96,21 +110,29 @@ function App() {
         setMessages(data.messages);
         setNotifications(data.notifications);
         
+        // Update location history from the server
+        if (data.locations && data.locations.length > 0) {
+          const validLocations = data.locations
+            .map(loc => loc.location)
+            .filter(loc => loc && loc.lat && loc.lng);
+            
+          setLocationHistory(validLocations);
+          
+          // Set current location to the most recent valid one
+          const lastValidLocation = validLocations[validLocations.length - 1];
+          if (lastValidLocation) {
+            setCurrentLocation(lastValidLocation);
+          }
+        }
+        
         // Update current message if there are any messages
         if (data.messages.length > 0) {
-          const newMessage = data.messages[data.messages.length - 1].content;
-          setCurrentMessage(newMessage);
+          const latestMessage = data.messages[0];
+          setCurrentMessage(latestMessage.content);
           
-          // Parse sensor data
-          const parsedData = parseSensorData(newMessage);
-          if (parsedData) {
-            setSensorData(parsedData);
-          }
-          
-          // Extract and update location history
-          const newLocation = extractLatLng(newMessage);
-          if (newLocation) {
-            setLocationHistory(prev => [...prev, newLocation]);
+          // If the message has location data, update current location
+          if (latestMessage.location) {
+            setCurrentLocation(latestMessage.location);
           }
         }
       } catch (error) {
@@ -125,49 +147,62 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const latLng = extractLatLng(currentMessage);
+  // Only render map if we have valid coordinates
+  const hasValidLocation = currentLocation && 
+    currentLocation.lat && 
+    currentLocation.lng && 
+    !isNaN(currentLocation.lat) && 
+    !isNaN(currentLocation.lng);
 
   return (
     <div className="app-container">
       <h1>SMS Messages</h1>
       
       <div className="current-message-container">
-        <h2>Sensor Data</h2>
-        {sensorData && <SensorDataTable data={sensorData} />}
-        {latLng && (
-          <div style={{ marginTop: 24, width: '100%', display: 'flex', justifyContent: 'center' }}>
-            <MapContainer center={[latLng.lat, latLng.lng]} zoom={15} style={{ height: '300px', width: '90%', maxWidth: 500, borderRadius: '12px', boxShadow: '0 2px 8px rgba(2,132,199,0.07)' }}>
-              <MapAutoFollow latLng={latLng} />
+        <h2>Location Tracking</h2>
+        {hasValidLocation && (
+          <div style={{ marginBottom: 32, width: '100%', display: 'flex', justifyContent: 'center' }}>
+            <MapContainer 
+              center={[currentLocation.lat, currentLocation.lng]} 
+              zoom={15} 
+              style={{ height: '400px', width: '100%', maxWidth: 800, borderRadius: '12px', boxShadow: '0 2px 8px rgba(2,132,199,0.07)' }}
+            >
+              <MapAutoFollow latLng={currentLocation} />
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
               />
-              <Marker position={[latLng.lat, latLng.lng]}>
-                <Popup>
-                  Current Location: [{latLng.lat}, {latLng.lng}]
-                </Popup>
-              </Marker>
+              {locationHistory.map((loc, index) => (
+                loc && loc.lat && loc.lng && (
+                  <Marker 
+                    key={index} 
+                    position={[loc.lat, loc.lng]}
+                  >
+                    <Popup>
+                      Location {index + 1}: [{loc.lat}, {loc.lng}]
+                    </Popup>
+                  </Marker>
+                )
+              ))}
               {locationHistory.length > 1 && (
                 <Polyline
-                  positions={locationHistory.map(loc => [loc.lat, loc.lng])}
+                  positions={locationHistory
+                    .filter(loc => loc && loc.lat && loc.lng)
+                    .map(loc => [loc.lat, loc.lng])}
                   color="blue"
                   weight={3}
                   opacity={0.7}
                 />
               )}
-              {locationHistory.map((loc, index) => (
-                <Marker key={index} position={[loc.lat, loc.lng]}>
-                  <Popup>
-                    Location {index + 1}: [{loc.lat}, {loc.lng}]
-                  </Popup>
-                </Marker>
-              ))}
             </MapContainer>
           </div>
         )}
+
+        <h2>Sensor Data</h2>
+        <SensorDataTable messages={messages} />
       </div>
 
-      <div className="notifications-section">
+      {/* <div className="notifications-section">
         <h2>Notifications</h2>
         <div className="notifications-container">
           {notifications.length === 0 ? (
@@ -197,7 +232,7 @@ function App() {
             ))
           )}
         </div>
-      </div>
+      </div> */}
     </div>
   )
 }

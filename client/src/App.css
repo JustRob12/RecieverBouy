@@ -91,6 +91,19 @@ h2 {
   box-shadow: 0 6px 24px rgba(2, 132, 199, 0.12);
 }
 
+.current-message-container h2 {
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: #0284c7;
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.current-message-container h2:not(:first-child) {
+  margin-top: 32px;
+}
+
 .current-message {
   font-size: 1.8rem;
   text-align: center;
@@ -214,48 +227,46 @@ h2 {
 
 .leaflet-container {
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(2,132,199,0.07);
+  box-shadow: 0 4px 16px rgba(2,132,199,0.1);
   margin: 0 auto;
+  border: 1px solid rgba(2,132,199,0.1);
 }
 
 .sensor-data-table {
-  margin: 20px auto;
-  width: 90%;
-  max-width: 800px;
+  width: 100%;
   overflow-x: auto;
+  margin: 20px 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(2,132,199,0.07);
 }
 
 .sensor-data-table table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(2, 132, 199, 0.08);
-}
-
-.sensor-data-table th,
-.sensor-data-table td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #e2e8f0;
 }
 
 .sensor-data-table th {
-  background-color: #f0f9ff;
-  color: #0369a1;
+  background-color: #f8fafc;
+  padding: 12px;
+  text-align: left;
   font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.85rem;
-  letter-spacing: 0.5px;
+  color: #1e293b;
+  border-bottom: 2px solid #e2e8f0;
 }
 
-.sensor-data-table tr:last-child td {
-  border-bottom: none;
+.sensor-data-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #475569;
 }
 
 .sensor-data-table tr:hover {
   background-color: #f8fafc;
+}
+
+.sensor-data-table tr:last-child td {
+  border-bottom: none;
 }
 
 @media (max-width: 768px) {
