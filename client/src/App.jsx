@@ -2,6 +2,28 @@ import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 function extractLatLng(message) {
   const latMatch = message.match(/Lat:\s*([\d.-]+)/);
@@ -90,6 +112,99 @@ function SensorDataTable({ messages }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function SensorGraphs({ messages }) {
+  // Process data for graphs
+  const processedData = messages
+    .map(message => {
+      const data = parseSensorData(message.content);
+      if (!data) return null;
+      return {
+        timestamp: new Date(message.timestamp),
+        ph: parseFloat(data.ph),
+        temperature: parseFloat(data.temperature),
+        tds: parseFloat(data.tdh)
+      };
+    })
+    .filter(data => data !== null)
+    .reverse(); // Show oldest to newest
+
+  const timestamps = processedData.map(data => data.timestamp.toLocaleTimeString());
+  
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: false,
+      },
+    },
+  };
+
+  const phData = {
+    labels: timestamps,
+    datasets: [
+      {
+        label: 'pH Level',
+        data: processedData.map(data => data.ph),
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1,
+      },
+    ],
+  };
+
+  const temperatureData = {
+    labels: timestamps,
+    datasets: [
+      {
+        label: 'Temperature (°C)',
+        data: processedData.map(data => parseFloat(data.temperature)),
+        borderColor: 'rgb(255, 99, 132)',
+        tension: 0.1,
+      },
+    ],
+  };
+
+  const tdsData = {
+    labels: timestamps,
+    datasets: [
+      {
+        label: 'TDS (ppm)',
+        data: processedData.map(data => data.tds),
+        borderColor: 'rgb(53, 162, 235)',
+        tension: 0.1,
+      },
+    ],
+  };
+
+  return (
+    <div className="sensor-graphs">
+      <div className="graph-container">
+        <h3>pH Level Over Time</h3>
+        <div className="graph-wrapper">
+          <Line options={chartOptions} data={phData} />
+        </div>
+      </div>
+      <div className="graph-container">
+        <h3>Temperature Over Time</h3>
+        <div className="graph-wrapper">
+          <Line options={chartOptions} data={temperatureData} />
+        </div>
+      </div>
+      <div className="graph-container">
+        <h3>TDS Over Time</h3>
+        <div className="graph-wrapper">
+          <Line options={chartOptions} data={tdsData} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -197,6 +312,9 @@ function App() {
             </MapContainer>
           </div>
         )}
+
+        <h2>Sensor Graphs</h2>
+        <SensorGraphs messages={messages} />
 
         <h2>Sensor Data</h2>
         <SensorDataTable messages={messages} />

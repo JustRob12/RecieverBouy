@@ -280,3 +280,42 @@ h2 {
     font-size: 0.9rem;
   }
 }
+
+.sensor-graphs {
+  margin: 32px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+.graph-container {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(2,132,199,0.07);
+  border: 1px solid rgba(2,132,199,0.1);
+}
+
+.graph-container h3 {
+  margin: 0 0 16px 0;
+  color: #0284c7;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.graph-wrapper {
+  height: 250px;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .sensor-graphs {
+    grid-template-columns: 1fr;
+  }
+  
+  .graph-wrapper {
+    height: 200px;
+  }
+}
