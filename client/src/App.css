@@ -495,3 +495,67 @@ h2 {
     height: 200px;
   }
 }
+
+@media (max-width: 768px) {
+  .map-container {
+    height: 250px !important;
+    min-height: 180px;
+    max-height: 300px;
+  }
+  .chart-container {
+    height: 180px !important;
+    min-height: 120px;
+    max-height: 220px;
+    padding: 0;
+  }
+  .card-body {
+    padding: 10px !important;
+  }
+  .row.g-4 > [class^='col-'] {
+    margin-bottom: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .map-container {
+    height: 180px !important;
+    min-height: 120px;
+    max-height: 200px;
+  }
+  .chart-container {
+    height: 120px !important;
+    min-height: 80px;
+    max-height: 150px;
+    padding: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .table-responsive {
+    overflow-x: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(2,132,199,0.07);
+    margin-bottom: 1rem;
+  }
+  .sensor-data-table table {
+    min-width: 600px;
+    font-size: 0.85rem;
+  }
+  .sensor-data-table th,
+  .sensor-data-table td {
+    padding: 6px 4px;
+    word-break: break-word;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .sensor-data-table table {
+    min-width: 400px;
+    font-size: 0.8rem;
+  }
+  .sensor-data-table th,
+  .sensor-data-table td {
+    padding: 4px 2px;
+  }
+}
