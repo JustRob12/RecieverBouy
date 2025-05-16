@@ -26,7 +26,7 @@ ChartJS.register(
   Legend
 );
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_URL_DEV || 'http://localhost:3000';
 
 function extractLatLng(message) {
   const latMatch = message.match(/Lat:\s*([\d.-]+)/);

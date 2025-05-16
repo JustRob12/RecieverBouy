@@ -3,10 +3,17 @@ import requests
 import json
 import time
 import re
+import os
+from dotenv import load_dotenv
 
-# Configure the serial port (change 'COM3' to your Arduino's port)
-ser = serial.Serial('COM11', 9600, timeout=1)
-server_url = 'http://localhost:3000/message'
+# Load environment variables
+load_dotenv()
+
+# Configure the serial port (change 'COM8' to your Arduino's port)
+ser = serial.Serial('COM8', 9600, timeout=1)
+
+# Get server URL from environment variable or use default
+server_url = os.getenv('SERVER_URL', 'https://recieverbouy.onrender.com/message')
 
 def process_message(message):
     try:
@@ -65,18 +72,32 @@ def process_message(message):
             if buoyId is not None:
                 data["buoyId"] = buoyId
         
-        # Send to server - no changes needed here as the server will handle parsing
-        response = requests.post(server_url, json=data)
-        if response.status_code == 200:
-            print(f"Message sent successfully: {data['content']}")
-            if 'buoyId' in data:
-                print(f"Buoy ID: {data['buoyId']}")
-        else:
-            print(f"Failed to send message. Status code: {response.status_code}")
+        # Send to server with retry mechanism
+        max_retries = 3
+        retry_delay = 5  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(server_url, json=data, timeout=10)
+                if response.status_code == 200:
+                    print(f"Message sent successfully: {data['content']}")
+                    if 'buoyId' in data:
+                        print(f"Buoy ID: {data['buoyId']}")
+                    break
+                else:
+                    print(f"Failed to send message. Status code: {response.status_code}")
+                    if attempt < max_retries - 1:
+                        print(f"Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+            except requests.exceptions.RequestException as e:
+                print(f"Error sending message to server: {e}")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
     except json.JSONDecodeError:
         print(f"Invalid JSON message: {message}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error sending message to server: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
 
 def extract_buoy_id(message):
     """Extract buoy ID from message content."""
