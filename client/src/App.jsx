@@ -3,6 +3,10 @@ import './App.css'
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -25,6 +29,14 @@ ChartJS.register(
   Tooltip,
   Legend
 );
+
+// Fix leaflet's default icon path for production build
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
 const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_URL_DEV || 'http://localhost:3000';
 
