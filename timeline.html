@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project Timeline</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 0;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10mm;
+            width: 297mm;
+            height: 210mm;
+            box-sizing: border-box;
+        }
+        .timeline-container {
+            position: relative;
+            width: 100%;
+            height: 180mm;
+        }
+        .weeks-header {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            margin-left: 70mm;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2mm;
+            margin-bottom: 5mm;
+        }
+        .week {
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            white-space: nowrap;
+        }
+        .task-container {
+            display: flex;
+            margin: 1.5mm 0;
+            position: relative;
+            height: 5mm;
+            align-items: center;
+        }
+        .task-label {
+            width: 68mm;
+            padding-right: 2mm;
+            text-align: right;
+            font-size: 10px;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .task-label.parent {
+            font-weight: bold;
+            font-size: 11px;
+            color: #000;
+        }
+        .timeline {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 1px;
+            height: 4mm;
+            position: relative;
+        }
+        .task-bar {
+            position: absolute;
+            height: 4mm;
+            border-radius: 1px;
+            transition: 0.3s;
+        }
+        .task-bar:hover {
+            opacity: 0.8;
+        }
+        .phase {
+            background-color: #4285f4;
+            height: 5mm;
+            margin-top: -0.5mm;
+            border: 1px solid #2b5797;
+        }
+        .requirements {
+            background-color: #5e97f6;
+        }
+        .design {
+            background-color: #a142f4;
+        }
+        .implementation {
+            background-color: #42c6f4;
+        }
+        .testing {
+            background-color: #f44242;
+        }
+        .deployment {
+            background-color: #42f44e;
+        }
+        .maintenance {
+            background-color: #808080;
+        }
+        .dependency-line {
+            position: absolute;
+            border-top: 1px solid #ccc;
+            border-right: 1px solid #ccc;
+            z-index: -1;
+        }
+        h1 {
+            text-align: center;
+            font-size: 14px;
+            margin: 2mm 0 8mm 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Project Timeline</h1>
+    <div class="timeline-container">
+        <div class="weeks-header">
+            <div class="week">Week 1</div>
+            <div class="week">Week 2</div>
+            <div class="week">Week 3</div>
+            <div class="week">Week 4</div>
+            <div class="week">Week 5</div>
+            <div class="week">Week 6</div>
+            <div class="week">Week 7</div>
+            <div class="week">Week 8</div>
+            <div class="week">Week 9</div>
+            <div class="week">Week 10</div>
+            <div class="week">Week 11</div>
+            <div class="week">Week 12</div>
+            <div class="week">Week 13</div>
+            <div class="week">Week 14</div>
+            <div class="week">Week 15</div>
+        </div>
+        <div id="tasks"></div>
+    </div>
+
+    <script>
+        const tasks = [
+            { id: '1.0', name: '1.0 Requirements Analysis', start: 1, end: 3, type: 'phase', isParent: true },
+            { id: '1.1', name: '1.1 Project Scope & Objectives', start: 1, end: 1, type: 'requirements', dependsOn: null },
+            { id: '1.2', name: '1.2 User & System Requirements', start: 2, end: 2, type: 'requirements', dependsOn: '1.1' },
+            { id: '1.3', name: '1.3 Key Functionalities Definition', start: 3, end: 3, type: 'requirements', dependsOn: '1.2' },
+
+            { id: '2.0', name: '2.0 System & Software Design', start: 4, end: 6, type: 'phase', isParent: true },
+            { id: '2.1', name: '2.1 System Architecture & DB Schema', start: 4, end: 4, type: 'design', dependsOn: '1.3' },
+            { id: '2.2', name: '2.2 UI/UX Wireframes & Mockups', start: 5, end: 5, type: 'design', dependsOn: '2.1' },
+            { id: '2.3', name: '2.3 Technical Stack Finalization', start: 6, end: 6, type: 'design', dependsOn: '2.2' },
+
+            { id: '3.0', name: '3.0 Implementation', start: 7, end: 9, type: 'phase', isParent: true },
+            { id: '3.1', name: '3.1 Backend Infrastructure', start: 7, end: 8, type: 'implementation', dependsOn: '2.3' },
+            { id: '3.2', name: '3.2 Frontend Interface', start: 8, end: 9, type: 'implementation', dependsOn: '3.1' },
+            { id: '3.3', name: '3.3 Real-time Tracking & Visualization', start: 9, end: 9, type: 'implementation', dependsOn: '3.2' },
+            { id: '3.4', name: '3.4 Full System Integration', start: 9, end: 9, type: 'implementation', dependsOn: '3.3' },
+
+            { id: '4.0', name: '4.0 Testing', start: 10, end: 12, type: 'phase', isParent: true },
+            { id: '4.1', name: '4.1 Unit Testing', start: 10, end: 10, type: 'testing', dependsOn: '3.4' },
+            { id: '4.2', name: '4.2 Integration Testing', start: 11, end: 11, type: 'testing', dependsOn: '4.1' },
+            { id: '4.3', name: '4.3 User Acceptance Testing', start: 12, end: 12, type: 'testing', dependsOn: '4.2' },
+
+            { id: '5.0', name: '5.0 Deployment', start: 13, end: 13, type: 'phase', isParent: true },
+            { id: '5.1', name: '5.1 Cloud Server Deployment', start: 13, end: 13, type: 'deployment', dependsOn: '4.3' },
+            { id: '5.2', name: '5.2 Performance Monitoring', start: 13, end: 13, type: 'deployment', dependsOn: '5.1' },
+
+            { id: '6.0', name: '6.0 Maintenance', start: 14, end: 15, type: 'phase', isParent: true },
+            { id: '6.1', name: '6.1 Security & Performance Updates', start: 14, end: 14, type: 'maintenance', dependsOn: '5.2' },
+            { id: '6.2', name: '6.2 Ongoing System Monitoring', start: 15, end: 15, type: 'maintenance', dependsOn: '6.1' }
+        ];
+
+        function createTaskElement(task) {
+            const container = document.createElement('div');
+            container.className = 'task-container';
+
+            const label = document.createElement('div');
+            label.className = task.isParent ? 'task-label parent' : 'task-label';
+            label.textContent = task.name;
+
+            const timeline = document.createElement('div');
+            timeline.className = 'timeline';
+
+            const bar = document.createElement('div');
+            bar.className = `task-bar ${task.type}`;
+            const startPercent = ((task.start - 1) / 15) * 100;
+            const width = ((task.end - task.start + 1) / 15) * 100;
+            bar.style.left = startPercent + '%';
+            bar.style.width = width + '%';
+
+            timeline.appendChild(bar);
+            container.appendChild(label);
+            container.appendChild(timeline);
+
+            if (task.dependsOn) {
+                const dependency = tasks.find(t => t.id === task.dependsOn);
+                if (dependency) {
+                    const line = document.createElement('div');
+                    line.className = 'dependency-line';
+                    const startX = ((dependency.end - 1) / 15) * 100;
+                    const endX = ((task.start - 1) / 15) * 100;
+                    line.style.left = `calc(70mm + ${startX}%)`;
+                    line.style.width = `${endX - startX}%`;
+                    line.style.top = '-5.5mm';
+                    timeline.appendChild(line);
+                }
+            }
+
+            return container;
+        }
+
+        const tasksContainer = document.getElementById('tasks');
+        tasks.forEach(task => {
+            tasksContainer.appendChild(createTaskElement(task));
+        });
+    </script>
+</body>
+</html> 

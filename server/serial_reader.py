@@ -5,7 +5,7 @@ import time
 import re
 
 # Configure the serial port (change 'COM3' to your Arduino's port)
-ser = serial.Serial('COM13', 9600, timeout=1)
+ser = serial.Serial('COM11', 9600, timeout=1)
 server_url = 'http://localhost:3000/message'
 
 def process_message(message):
@@ -33,10 +33,18 @@ def process_message(message):
             content_marker = '✉️ Message content:'
             if content_marker in message:
                 content = message.split(content_marker, 1)[1].strip()
+                
+                # Try to extract buoyId from the message content
+                buoyId = extract_buoy_id(content)
+                
                 data = {
                     "content": content,
                     "type": "message"
                 }
+                
+                # Add buoyId to data if available
+                if buoyId is not None:
+                    data["buoyId"] = buoyId
             else:
                 # If no content marker found, use the whole message
                 data = {
@@ -45,21 +53,45 @@ def process_message(message):
                 }
         else:
             # It's a regular message or response
+            # Try to extract buoyId from the message content
+            buoyId = extract_buoy_id(message)
+                
             data = {
                 "content": message,
                 "type": "message"
             }
         
-        # Send to server
+            # Add buoyId to data if available
+            if buoyId is not None:
+                data["buoyId"] = buoyId
+        
+        # Send to server - no changes needed here as the server will handle parsing
         response = requests.post(server_url, json=data)
         if response.status_code == 200:
             print(f"Message sent successfully: {data['content']}")
+            if 'buoyId' in data:
+                print(f"Buoy ID: {data['buoyId']}")
         else:
             print(f"Failed to send message. Status code: {response.status_code}")
     except json.JSONDecodeError:
         print(f"Invalid JSON message: {message}")
     except requests.exceptions.RequestException as e:
         print(f"Error sending message to server: {e}")
+
+def extract_buoy_id(message):
+    """Extract buoy ID from message content."""
+    try:
+        # Split message by comma and check first part
+        parts = message.split(',')
+        if parts and len(parts) >= 1:
+            first_part = parts[0].strip()
+            # If the first part is a number and it's 1 or 2 (valid buoy IDs)
+            if first_part.isdigit() and 1 <= int(first_part) <= 10:
+                return int(first_part)
+    except Exception as e:
+        print(f"Error extracting buoy ID: {e}")
+    
+    return None
 
 print("Serial reader started. Waiting for messages...")
 

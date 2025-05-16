@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Project Gantt Chart</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load('current', {'packages':['gantt']});
+      google.charts.setOnLoadCallback(drawChart);
+
+      function drawChart() {
+        var data = new google.visualization.DataTable();
+        data.addColumn('string', 'Task ID');
+        data.addColumn('string', 'Task Name');
+        data.addColumn('string', 'Resource');
+        data.addColumn('date', 'Start Date');
+        data.addColumn('date', 'End Date');
+        data.addColumn('number', 'Duration');
+        data.addColumn('number', 'Percent Complete');
+        data.addColumn('string', 'Dependencies');
+
+        // Helper function to convert week number to date (required by Google Charts)
+        function weekToDate(week) {
+          return new Date(2024, 0, week * 7);
+        }
+
+        data.addRows([
+          // Requirements Analysis Phase
+          ['1.0', '1.0 Requirements Analysis', null, weekToDate(1), weekToDate(3), null, 100, null],
+          ['1.1', '1.1 Project Scope & Objectives', 'Requirements', weekToDate(1), weekToDate(1), null, 100, null],
+          ['1.2', '1.2 User & System Requirements', 'Requirements', weekToDate(2), weekToDate(2), null, 100, '1.1'],
+          ['1.3', '1.3 Key Functionalities Definition', 'Requirements', weekToDate(3), weekToDate(3), null, 100, '1.2'],
+
+          // System & Software Design Phase
+          ['2.0', '2.0 System & Software Design', null, weekToDate(4), weekToDate(6), null, 100, '1.3'],
+          ['2.1', '2.1 System Architecture & DB Schema', 'Design', weekToDate(4), weekToDate(4), null, 100, null],
+          ['2.2', '2.2 UI/UX Wireframes & Mockups', 'Design', weekToDate(5), weekToDate(5), null, 100, '2.1'],
+          ['2.3', '2.3 Technical Stack Finalization', 'Design', weekToDate(6), weekToDate(6), null, 100, '2.2'],
+
+          // Implementation Phase
+          ['3.0', '3.0 Implementation', null, weekToDate(7), weekToDate(9), null, 80, '2.3'],
+          ['3.1', '3.1 Backend Infrastructure', 'Implementation', weekToDate(7), weekToDate(8), null, 100, null],
+          ['3.2', '3.2 Frontend Interface', 'Implementation', weekToDate(8), weekToDate(9), null, 80, '3.1'],
+          ['3.3', '3.3 Real-time Tracking & Visualization', 'Implementation', weekToDate(9), weekToDate(9), null, 60, '3.2'],
+          ['3.4', '3.4 Full System Integration', 'Implementation', weekToDate(9), weekToDate(9), null, 50, '3.3'],
+
+          // Testing Phase
+          ['4.0', '4.0 Testing', null, weekToDate(10), weekToDate(12), null, 50, '3.4'],
+          ['4.1', '4.1 Unit Testing', 'Testing', weekToDate(10), weekToDate(10), null, 100, null],
+          ['4.2', '4.2 Integration Testing', 'Testing', weekToDate(11), weekToDate(11), null, 80, '4.1'],
+          ['4.3', '4.3 User Acceptance Testing', 'Testing', weekToDate(12), weekToDate(12), null, 50, '4.2'],
+
+          // Deployment Phase
+          ['5.0', '5.0 Deployment', null, weekToDate(13), weekToDate(13), null, 20, '4.3'],
+          ['5.1', '5.1 Cloud Server Deployment', 'Deployment', weekToDate(13), weekToDate(13), null, 20, null],
+          ['5.2', '5.2 Performance Monitoring', 'Deployment', weekToDate(13), weekToDate(13), null, 10, '5.1'],
+
+          // Maintenance Phase
+          ['6.0', '6.0 Maintenance', null, weekToDate(14), weekToDate(15), null, 0, '5.2'],
+          ['6.1', '6.1 Security & Performance Updates', 'Maintenance', weekToDate(14), weekToDate(14), null, 0, null],
+          ['6.2', '6.2 Ongoing System Monitoring', 'Maintenance', weekToDate(15), weekToDate(15), null, 0, '6.1']
+        ]);
+
+        var options = {
+          height: 800,
+          gantt: {
+            criticalPathEnabled: true,
+            criticalPathStyle: {
+              stroke: '#e64a19',
+              strokeWidth: 2
+            },
+            arrow: {
+              angle: 100,
+              width: 1,
+              color: '#333',
+              radius: 0
+            },
+            labelStyle: {
+              fontName: 'Arial',
+              fontSize: 12
+            },
+            barHeight: 15,
+            barCornerRadius: 0,
+            shadowEnabled: false,
+            palette: [
+              '#4285f4',  // Parent tasks
+              '#5e97f6',  // Requirements
+              '#a142f4',  // Design
+              '#42c6f4',  // Implementation
+              '#f44242',  // Testing
+              '#42f44e',  // Deployment
+              '#808080'   // Maintenance
+            ]
+          },
+          hAxis: {
+            format: 'Week #',
+            textStyle: {
+              fontSize: 12
+            },
+            ticks: Array.from({length: 15}, (_, i) => ({
+              v: weekToDate(i + 1),
+              f: 'Week ' + (i + 1)
+            }))
+          }
+        };
+
+        var container = document.getElementById('chart_div');
+        var chart = new google.visualization.Gantt(container);
+
+        chart.draw(data, options);
+
+        // Add custom week labels
+        var weekLabels = document.createElement('div');
+        weekLabels.className = 'week-labels';
+        for (let i = 1; i <= 15; i++) {
+          var label = document.createElement('span');
+          label.textContent = 'Week ' + i;
+          weekLabels.appendChild(label);
+        }
+        container.parentNode.insertBefore(weekLabels, container.nextSibling);
+      }
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+      .week-labels {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 40px;
+        margin-top: -20px;
+        color: #666;
+        font-size: 12px;
+      }
+      #chart_div {
+        margin-top: 20px;
+        padding: 20px;
+      }
+      h2 {
+        text-align: center;
+        color: #333;
+      }
+      /* Hide any date-related text that might appear */
+      text[text-anchor="middle"] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Project Gantt Chart</h2>
+    <div id="chart_div"></div>
+  </body>
+</html>
