@@ -163,8 +163,12 @@ app.get('/messages', async (req, res) => {
       .sort({ timestamp: -1 })
       .limit(10);
     
-    // Get all locations for the map
-    const locations = await Message.find({ location: { $exists: true, $ne: null } })
+    // Get ALL locations for the map, without limit
+    const locations = await Message.find({ 
+      location: { $exists: true, $ne: null },
+      'location.lat': { $exists: true, $ne: null },
+      'location.lng': { $exists: true, $ne: null }
+    })
       .select('location timestamp buoyId')
       .sort({ timestamp: 1 }); // Sort by timestamp in ascending order for the path
     

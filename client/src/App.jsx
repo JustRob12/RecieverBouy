@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -39,6 +39,20 @@ L.Icon.Default.mergeOptions({
 });
 
 const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_URL_DEV || 'http://localhost:3000';
+
+// Define colors for different buoys
+const buoyColors = {
+  0: '#FF0000', // Red
+  1: '#0000FF', // Blue
+  2: '#00FF00', // Green
+  3: '#FFA500', // Orange
+  4: '#800080', // Purple
+  5: '#FF69B4', // Hot Pink
+  6: '#00FFFF', // Cyan
+  7: '#FFD700', // Gold
+  8: '#8B4513', // Saddle Brown
+  9: '#4B0082'  // Indigo
+};
 
 function extractLatLng(message) {
   const latMatch = message.match(/Lat:\s*([\d.-]+)/);
@@ -749,6 +763,7 @@ function App() {
   const [locations, setLocations] = useState([]);
   const messagesEndRef = useRef(null);
   const [selectedBuoyId, setSelectedBuoyId] = useState(null);
+  const [mapZoom, setMapZoom] = useState(13);
 
   useEffect(() => {
     // Initial fetch
@@ -761,23 +776,18 @@ function App() {
     return () => clearInterval(interval);
   }, []);
   
-    const fetchMessages = async () => {
-      try {
-        const response = await fetch(`${API_URL}/messages`);
-        const data = await response.json();
-        setMessages(data.messages);
-        setNotifications(data.notifications);
-        setLocations(data.locations);
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-      }
-    };
+  const fetchMessages = async () => {
+    try {
+      const response = await fetch(`${API_URL}/messages`);
+      const data = await response.json();
+      setMessages(data.messages);
+      setNotifications(data.notifications);
+      setLocations(data.locations);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
 
-  // Scroll to bottom of messages when new ones arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-  
   // Filter data by selected buoy ID
   const filteredLocations = selectedBuoyId === null
     ? locations
@@ -789,22 +799,23 @@ function App() {
     if (!acc[buoyId]) {
       acc[buoyId] = [];
     }
-    acc[buoyId].push([location.location.lat, location.location.lng]);
+    if (location.location && location.location.lat && location.location.lng) {
+      acc[buoyId].push([location.location.lat, location.location.lng]);
+    }
     return acc;
   }, {});
-  
-  // Define colors for different buoys
-  const buoyColors = {
-    1: '#ff0000', // Red for buoy 1
-    2: '#0000ff', // Blue for buoy 2
-    0: '#00ff00'  // Green for unidentified buoys
-  };
-  
+
   // Get the most recent location from each buoy
   const latestLocationsByBuoy = {};
   filteredLocations.forEach(location => {
     const buoyId = location.buoyId || 0;
-    if (!latestLocationsByBuoy[buoyId] || new Date(location.timestamp) > new Date(latestLocationsByBuoy[buoyId].timestamp)) {
+    if (
+      location.location &&
+      location.location.lat &&
+      location.location.lng &&
+      (!latestLocationsByBuoy[buoyId] || 
+       new Date(location.timestamp) > new Date(latestLocationsByBuoy[buoyId].timestamp))
+    ) {
       latestLocationsByBuoy[buoyId] = {
         location: location.location,
         timestamp: location.timestamp
@@ -812,16 +823,22 @@ function App() {
     }
   });
 
-  // Get most recent location
-  const latestLocation = filteredLocations.length > 0 ? filteredLocations[filteredLocations.length - 1].location : null;
+  // Get most recent location for map center
+  const latestLocation = filteredLocations.length > 0 
+    ? filteredLocations[filteredLocations.length - 1].location 
+    : null;
   
   // Initialize map center to latest location or default
-  const initialCenter = latestLocation ? [latestLocation.lat, latestLocation.lng] : [7.3146, 126.5156];
+  const initialCenter = latestLocation 
+    ? [latestLocation.lat, latestLocation.lng] 
+    : [7.3146, 126.5156];
 
   // Get unique buoy IDs for filtering
   const uniqueBuoyIds = [...new Set(
-    messages.map(message => message.buoyId).filter(id => id !== undefined)
-  )];
+    messages
+      .map(message => message.buoyId)
+      .filter(id => id !== undefined && id !== null)
+  )].sort((a, b) => a - b);
 
   return (
     <div className="app-container">
@@ -924,12 +941,21 @@ function App() {
         <div className="row g-4 mt-4">
           <div className="col-lg-12">
             <div className="card shadow-sm mb-4">
-            <div className="card-header bg-primary text-white">
+            <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h2 className="h4 mb-0">GPS Tracking</h2>
               </div>
               <div className="card-body p-0">
                 <div className="map-container">
-                  <MapContainer center={initialCenter} zoom={13} style={{ height: '500px', width: '100%' }}>
+                  <MapContainer 
+                    center={initialCenter} 
+                    zoom={mapZoom} 
+                    style={{ height: '500px', width: '100%' }}
+                    whenCreated={mapInstance => {
+                      mapInstance.on('zoomend', () => {
+                        setMapZoom(mapInstance.getZoom());
+                      });
+                    }}
+                  >
                     <TileLayer
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -937,25 +963,66 @@ function App() {
                     
                     {/* Draw paths for each buoy with different colors */}
                     {Object.entries(locationsByBuoy).map(([buoyId, points]) => (
-                      <Polyline 
-                        key={`path-${buoyId}`}
-                        positions={points} 
-                        color={buoyColors[buoyId] || '#3388ff'} 
-                        weight={3} 
-                        opacity={0.7} 
-                      />
+                      <React.Fragment key={`buoy-${buoyId}`}>
+                        {/* Draw the path line */}
+                        <Polyline 
+                          positions={points} 
+                          color={buoyColors[buoyId] || '#3388ff'} 
+                          weight={3} 
+                          opacity={0.7} 
+                        />
+                        
+                        {/* Add markers for all points along the path */}
+                        {points.map((point, index) => (
+                          <Marker 
+                            key={`point-${buoyId}-${index}`}
+                            position={point}
+                            icon={L.divIcon({
+                              className: 'custom-div-icon',
+                              html: `<div style="background-color: ${buoyColors[buoyId] || '#3388ff'}; 
+                                        width: 8px; 
+                                        height: 8px; 
+                                        border-radius: 50%;
+                                        border: 1px solid white;">
+                                    </div>`,
+                              iconSize: [8, 8],
+                              iconAnchor: [4, 4]
+                            })}
+                          >
+                            <Popup>
+                              <strong>Buoy {buoyId}</strong><br />
+                              Point {index + 1}<br />
+                              Lat: {point[0].toFixed(6)}<br />
+                              Lng: {point[1].toFixed(6)}
+                            </Popup>
+                          </Marker>
+                        ))}
+                      </React.Fragment>
                     ))}
                     
-                    {/* Place markers for the latest position of each buoy */}
+                    {/* Place larger markers for the latest position of each buoy */}
                     {Object.entries(latestLocationsByBuoy).map(([buoyId, data]) => (
                       <Marker 
-                        key={`marker-${buoyId}`}
+                        key={`latest-${buoyId}`}
                         position={[data.location.lat, data.location.lng]}
+                        icon={L.divIcon({
+                          className: 'custom-div-icon',
+                          html: `<div style="background-color: ${buoyColors[buoyId] || '#3388ff'}; 
+                                    width: 16px; 
+                                    height: 16px; 
+                                    border-radius: 50%;
+                                    border: 2px solid white;
+                                    box-shadow: 0 0 4px rgba(0,0,0,0.4);">
+                                </div>`,
+                          iconSize: [16, 16],
+                          iconAnchor: [8, 8]
+                        })}
                       >
                         <Popup>
                           <strong>Buoy {buoyId}</strong><br />
-                          Lat: {data.location.lat}<br />
-                          Lng: {data.location.lng}<br />
+                          <strong>Latest Position</strong><br />
+                          Lat: {data.location.lat.toFixed(6)}<br />
+                          Lng: {data.location.lng.toFixed(6)}<br />
                           Last updated: {new Date(data.timestamp).toLocaleString()}
                         </Popup>
                       </Marker>
