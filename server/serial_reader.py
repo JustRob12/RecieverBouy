@@ -21,6 +21,9 @@ def process_message(message):
         # Clean up the message
         message = message.strip()
         
+        # Debug log
+        print(f"\nProcessing new message: {message}")
+        
         # Check if it's a notification message
         if "+CMTI:" in message:
             # Extract the message index
@@ -107,51 +110,79 @@ def process_message(message):
 def parse_structured_message(message):
     """Parse the structured message format."""
     try:
+        print(f"Attempting to parse message: {message}")  # Debug log
         # Expected format: buoyId,date,time,coordinates,ph,tds,temp
         parts = message.strip().split(',')
         if len(parts) == 7:
             # Extract coordinates
             coords_part = parts[3].strip()
-            lat = float(coords_part.split('Lat:')[1].split('Lng:')[0].strip())
-            lng = float(coords_part.split('Lng:')[1].strip())
-            
-            # Parse numeric values with validation
             try:
-                ph = float(parts[4].strip())
-                tds = float(parts[5].strip())
-                temp = float(parts[6].strip())
+                lat = float(coords_part.split('Lat:')[1].split('Lng:')[0].strip())
+                lng = float(coords_part.split('Lng:')[1].strip())
                 
-                # Validate numeric values
-                if any(math.isnan(x) for x in [ph, tds, temp]):
-                    print("Warning: Invalid numeric values detected")
+                # Debug log coordinates
+                print(f"Parsed coordinates - Lat: {lat}, Lng: {lng}")
+                
+                if math.isnan(lat) or math.isnan(lng):
+                    print("Warning: Invalid coordinates detected")
+                    return None
+            except Exception as e:
+                print(f"Error parsing coordinates: {e}")
+                return None
+            
+            # Parse and validate numeric values with extensive checks
+            try:
+                # Strip whitespace and handle empty values
+                ph_str = parts[4].strip()
+                tds_str = parts[5].strip()
+                temp_str = parts[6].strip()
+                
+                # Debug log raw values
+                print(f"Raw values - pH: '{ph_str}', TDS: '{tds_str}', Temp: '{temp_str}'")
+                
+                # Check for empty or invalid strings
+                if not ph_str or not tds_str or not temp_str:
+                    print("Warning: Empty values detected")
                     return None
                 
-                # Additional validation for reasonable ranges
-                if not (0 <= ph <= 14):  # pH range
+                # Convert to float with validation
+                ph = float(ph_str)
+                tds = float(tds_str)
+                temp = float(temp_str)
+                
+                # Debug log parsed values
+                print(f"Parsed values - pH: {ph}, TDS: {tds}, Temp: {temp}")
+                
+                # Validate for NaN and infinity
+                if (math.isnan(ph) or math.isnan(tds) or math.isnan(temp) or
+                    math.isinf(ph) or math.isinf(tds) or math.isinf(temp)):
+                    print("Warning: NaN or Infinity values detected")
+                    return None
+                
+                # Validate ranges
+                if not (0 <= ph <= 14):
                     print(f"Warning: pH value {ph} out of valid range (0-14)")
-                    ph = None
-                if tds < 0:  # TDS should be positive
-                    print(f"Warning: Invalid TDS value {tds}")
-                    tds = None
-                if not (-10 <= temp <= 50):  # reasonable temperature range in Celsius
-                    print(f"Warning: Temperature value {temp} out of reasonable range")
-                    temp = None
-                
-                # Only return data if we have valid values
-                if ph is not None and tds is not None and temp is not None:
-                    return {
-                        "buoyId": int(parts[0]),
-                        "date": parts[1].strip(),
-                        "time": parts[2].strip(),
-                        "latitude": lat,
-                        "longitude": lng,
-                        "ph": ph,
-                        "tds": tds,
-                        "temperature": temp
-                    }
-                else:
-                    print("Warning: Some sensor values were invalid")
                     return None
+                    
+                if tds < 0 or tds > 5000:  # Added upper limit for TDS
+                    print(f"Warning: Invalid TDS value {tds}")
+                    return None
+                    
+                if not (-10 <= temp <= 50):
+                    print(f"Warning: Temperature value {temp} out of reasonable range")
+                    return None
+                
+                # If we get here, all values are valid
+                return {
+                    "buoyId": int(parts[0]),
+                    "date": parts[1].strip(),
+                    "time": parts[2].strip(),
+                    "latitude": lat,
+                    "longitude": lng,
+                    "ph": ph,
+                    "tds": tds,
+                    "temperature": temp
+                }
                     
             except ValueError as e:
                 print(f"Error parsing numeric values: {e}")
@@ -159,6 +190,7 @@ def parse_structured_message(message):
                 
     except Exception as e:
         print(f"Error parsing structured message: {e}")
+        print(f"Message parts: {parts if 'parts' in locals() else 'Not split yet'}")
     return None
 
 def extract_buoy_id(message):
