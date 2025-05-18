@@ -5,12 +5,13 @@ import time
 import re
 import os
 from dotenv import load_dotenv
+import math
 
 # Load environment variables
 load_dotenv()
 
 # Configure the serial port (change 'COM8' to your Arduino's port)
-ser = serial.Serial('COM8', 9600, timeout=1)
+ser = serial.Serial('COM4', 9600, timeout=1)
 
 # Get server URL from environment variable or use default
 server_url = os.getenv('SERVER_URL', 'https://recieverbouy.onrender.com/message')
@@ -41,17 +42,19 @@ def process_message(message):
             if content_marker in message:
                 content = message.split(content_marker, 1)[1].strip()
                 
-                # Try to extract buoyId from the message content
-                buoyId = extract_buoy_id(content)
-                
-                data = {
-                    "content": content,
-                    "type": "message"
-                }
-                
-                # Add buoyId to data if available
-                if buoyId is not None:
-                    data["buoyId"] = buoyId
+                # Parse the structured message
+                parsed_data = parse_structured_message(content)
+                if parsed_data:
+                    data = {
+                        "content": content,
+                        "type": "message",
+                        **parsed_data  # Include all parsed fields
+                    }
+                else:
+                    data = {
+                        "content": content,
+                        "type": "message"
+                    }
             else:
                 # If no content marker found, use the whole message
                 data = {
@@ -60,18 +63,20 @@ def process_message(message):
                 }
         else:
             # It's a regular message or response
-            # Try to extract buoyId from the message content
-            buoyId = extract_buoy_id(message)
-                
-            data = {
-                "content": message,
-                "type": "message"
-            }
-        
-            # Add buoyId to data if available
-            if buoyId is not None:
-                data["buoyId"] = buoyId
-        
+            # Try to parse structured message
+            parsed_data = parse_structured_message(message)
+            if parsed_data:
+                data = {
+                    "content": message,
+                    "type": "message",
+                    **parsed_data  # Include all parsed fields
+                }
+            else:
+                data = {
+                    "content": message,
+                    "type": "message"
+                }
+
         # Send to server with retry mechanism
         max_retries = 3
         retry_delay = 5  # seconds
@@ -99,6 +104,63 @@ def process_message(message):
     except Exception as e:
         print(f"Unexpected error: {e}")
 
+def parse_structured_message(message):
+    """Parse the structured message format."""
+    try:
+        # Expected format: buoyId,date,time,coordinates,ph,tds,temp
+        parts = message.strip().split(',')
+        if len(parts) == 7:
+            # Extract coordinates
+            coords_part = parts[3].strip()
+            lat = float(coords_part.split('Lat:')[1].split('Lng:')[0].strip())
+            lng = float(coords_part.split('Lng:')[1].strip())
+            
+            # Parse numeric values with validation
+            try:
+                ph = float(parts[4].strip())
+                tds = float(parts[5].strip())
+                temp = float(parts[6].strip())
+                
+                # Validate numeric values
+                if any(math.isnan(x) for x in [ph, tds, temp]):
+                    print("Warning: Invalid numeric values detected")
+                    return None
+                
+                # Additional validation for reasonable ranges
+                if not (0 <= ph <= 14):  # pH range
+                    print(f"Warning: pH value {ph} out of valid range (0-14)")
+                    ph = None
+                if tds < 0:  # TDS should be positive
+                    print(f"Warning: Invalid TDS value {tds}")
+                    tds = None
+                if not (-10 <= temp <= 50):  # reasonable temperature range in Celsius
+                    print(f"Warning: Temperature value {temp} out of reasonable range")
+                    temp = None
+                
+                # Only return data if we have valid values
+                if ph is not None and tds is not None and temp is not None:
+                    return {
+                        "buoyId": int(parts[0]),
+                        "date": parts[1].strip(),
+                        "time": parts[2].strip(),
+                        "latitude": lat,
+                        "longitude": lng,
+                        "ph": ph,
+                        "tds": tds,
+                        "temperature": temp
+                    }
+                else:
+                    print("Warning: Some sensor values were invalid")
+                    return None
+                    
+            except ValueError as e:
+                print(f"Error parsing numeric values: {e}")
+                return None
+                
+    except Exception as e:
+        print(f"Error parsing structured message: {e}")
+    return None
+
 def extract_buoy_id(message):
     """Extract buoy ID from message content."""
     try:
@@ -106,7 +168,7 @@ def extract_buoy_id(message):
         parts = message.split(',')
         if parts and len(parts) >= 1:
             first_part = parts[0].strip()
-            # If the first part is a number and it's 1 or 2 (valid buoy IDs)
+            # If the first part is a number and it's between 1 and 10 (valid buoy IDs)
             if first_part.isdigit() and 1 <= int(first_part) <= 10:
                 return int(first_part)
     except Exception as e:
