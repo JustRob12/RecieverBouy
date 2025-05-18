@@ -20,77 +20,60 @@ def process_message(message):
     try:
         # Clean up the message
         message = message.strip()
-        
-        # Debug log
         print(f"\nProcessing new message: {message}")
+
+        # Extract actual message content from GSM format
+        actual_content = None
         
-        # Check if it's a notification message
-        if "+CMTI:" in message:
-            # Extract the message index
-            match = re.search(r'\+CMTI: "SM",(\d+)', message)
-            if match:
-                index = match.group(1)
+        # Split message into lines
+        lines = message.split('\n')
+        for i, line in enumerate(lines):
+            # Skip empty lines
+            if not line.strip():
+                continue
+            # If this is a data line (contains commas and numbers)
+            if re.match(r'^\d+,\d{2}-\d{2}-\d{4}', line.strip()):
+                actual_content = line.strip()
+                break
+            # If this is after "Message content:" line
+            if "Message content:" in line and i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                if next_line:
+                    actual_content = next_line
+                    break
+
+        if actual_content:
+            print(f"Found data content: {actual_content}")
+            # Try to parse the structured message
+            parsed_data = parse_structured_message(actual_content)
+            if parsed_data:
                 data = {
-                    "content": f"New SMS received at index {index}",
-                    "type": "notification"
+                    "content": actual_content,
+                    "type": "message",
+                    **parsed_data
                 }
             else:
                 data = {
-                    "content": message,
-                    "type": "notification"
-                }
-        elif "+CMT:" in message:
-            # Extract everything after '✉️ Message content:' (including newlines)
-            content_marker = '✉️ Message content:'
-            if content_marker in message:
-                content = message.split(content_marker, 1)[1].strip()
-                
-                # Parse the structured message
-                parsed_data = parse_structured_message(content)
-                if parsed_data:
-                    data = {
-                        "content": content,
-                        "type": "message",
-                        **parsed_data  # Include all parsed fields
-                    }
-                else:
-                    data = {
-                        "content": content,
-                        "type": "message"
-                    }
-            else:
-                # If no content marker found, use the whole message
-                data = {
-                    "content": message,
+                    "content": actual_content,
                     "type": "message"
                 }
         else:
-            # It's a regular message or response
-            # Try to parse structured message
-            parsed_data = parse_structured_message(message)
-            if parsed_data:
-                data = {
-                    "content": message,
-                    "type": "message",
-                    **parsed_data  # Include all parsed fields
-                }
-            else:
-                data = {
-                    "content": message,
-                    "type": "message"
-                }
-
+            # Fallback to original message
+            data = {
+                "content": message,
+                "type": "message"
+            }
+        
         # Send to server with retry mechanism
         max_retries = 3
         retry_delay = 5  # seconds
         
         for attempt in range(max_retries):
             try:
+                print(f"Sending data to server: {data}")  # Debug print
                 response = requests.post(server_url, json=data, timeout=10)
                 if response.status_code == 200:
-                    print(f"Message sent successfully: {data['content']}")
-                    if 'buoyId' in data:
-                        print(f"Buoy ID: {data['buoyId']}")
+                    print(f"Message sent successfully: {data}")
                     break
                 else:
                     print(f"Failed to send message. Status code: {response.status_code}")
@@ -102,10 +85,9 @@ def process_message(message):
                 if attempt < max_retries - 1:
                     print(f"Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
-    except json.JSONDecodeError:
-        print(f"Invalid JSON message: {message}")
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"Unexpected error in process_message: {e}")
+        print(f"Original message was: {message}")
 
 def parse_structured_message(message):
     """Parse the structured message format."""
@@ -114,13 +96,17 @@ def parse_structured_message(message):
         # Expected format: buoyId,date,time,coordinates,ph,tds,temp
         parts = message.strip().split(',')
         if len(parts) == 7:
+            # Print all parts for debugging
+            print("\nMessage parts:")
+            for i, part in enumerate(parts):
+                print(f"Part {i}: '{part.strip()}'")
+            
             # Extract coordinates
             coords_part = parts[3].strip()
             try:
                 lat = float(coords_part.split('Lat:')[1].split('Lng:')[0].strip())
                 lng = float(coords_part.split('Lng:')[1].strip())
                 
-                # Debug log coordinates
                 print(f"Parsed coordinates - Lat: {lat}, Lng: {lng}")
                 
                 if math.isnan(lat) or math.isnan(lng):
@@ -137,42 +123,56 @@ def parse_structured_message(message):
                 tds_str = parts[5].strip()
                 temp_str = parts[6].strip()
                 
-                # Debug log raw values
-                print(f"Raw values - pH: '{ph_str}', TDS: '{tds_str}', Temp: '{temp_str}'")
+                # Extra debug for TDS
+                print(f"\nDetailed TDS debug:")
+                print(f"Raw TDS string: '{tds_str}'")
+                print(f"TDS string length: {len(tds_str)}")
+                print(f"TDS string characters (hex):", ' '.join(hex(ord(c)) for c in tds_str))
                 
                 # Check for empty or invalid strings
-                if not ph_str or not tds_str or not temp_str:
-                    print("Warning: Empty values detected")
+                if not ph_str or not temp_str:
+                    print("Warning: Empty pH or temperature values detected")
                     return None
                 
-                # Convert to float with validation
-                ph = float(ph_str)
-                tds = float(tds_str)
-                temp = float(temp_str)
+                # Special handling for TDS
+                if not tds_str or tds_str.lower() == 'nan':
+                    print("Warning: Invalid TDS value, using default")
+                    tds = 0  # Default value when TDS is invalid
+                else:
+                    try:
+                        tds = float(tds_str)
+                        if math.isnan(tds) or math.isinf(tds):
+                            print("Warning: TDS is NaN or Inf, using default")
+                            tds = 0
+                    except ValueError:
+                        print("Warning: Could not parse TDS value, using default")
+                        tds = 0
                 
-                # Debug log parsed values
-                print(f"Parsed values - pH: {ph}, TDS: {tds}, Temp: {temp}")
-                
-                # Validate for NaN and infinity
-                if (math.isnan(ph) or math.isnan(tds) or math.isnan(temp) or
-                    math.isinf(ph) or math.isinf(tds) or math.isinf(temp)):
-                    print("Warning: NaN or Infinity values detected")
-                    return None
-                
-                # Validate ranges
-                if not (0 <= ph <= 14):
-                    print(f"Warning: pH value {ph} out of valid range (0-14)")
+                # Convert other values to float with validation
+                try:
+                    ph = float(ph_str)
+                    print(f"Successfully parsed pH: {ph}")
+                except ValueError as e:
+                    print(f"Error parsing pH: {e}")
                     return None
                     
-                if tds < 0 or tds > 5000:  # Added upper limit for TDS
-                    print(f"Warning: Invalid TDS value {tds}")
+                try:
+                    temp = float(temp_str)
+                    print(f"Successfully parsed temperature: {temp}")
+                except ValueError as e:
+                    print(f"Error parsing temperature: {e}")
+                    return None
+                
+                # Validate ranges for pH and temperature
+                if not (0 <= ph <= 14):
+                    print(f"Warning: pH value {ph} out of valid range (0-14)")
                     return None
                     
                 if not (-10 <= temp <= 50):
                     print(f"Warning: Temperature value {temp} out of reasonable range")
                     return None
                 
-                # If we get here, all values are valid
+                # If we get here, we have valid values (TDS might be 0 if invalid)
                 return {
                     "buoyId": int(parts[0]),
                     "date": parts[1].strip(),
@@ -180,7 +180,7 @@ def parse_structured_message(message):
                     "latitude": lat,
                     "longitude": lng,
                     "ph": ph,
-                    "tds": tds,
+                    "tds": tds,  # This will be 0 if invalid
                     "temperature": temp
                 }
                     
